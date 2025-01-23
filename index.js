@@ -1,72 +1,120 @@
-const express = require('express')
+const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
-const app = express()
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const app = express();
 const port = process.env.PORT || 5000;
-
-
-
 
 app.use(cors());
 app.use(express.json());
 
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.zjl69.mongodb.net/?retryWrites=true&w=majority`;
 
-
-
-
-
-
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.zjl69.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
+    const database = client.db('HuntifyDB');
+    const productsCollection = database.collection('products');
+    const usersCollection = database.collection('users'); 
 
-    const database = client.db("HuntifyDB");
-    const productsCollection = database.collection("products");
+
+
+
+
+    app.get('/products', async (req, res) => {
+      const products = await productsCollection.find().toArray();
+      res.send(products);
+    });
+
+    // Upvote a product
+    app.post('/products/vote/:productName', async (req, res) => {
+      const { productName } = req.params;
+      const { userEmail } = req.body;
+
+      const product = await productsCollection.findOne({ name: productName });
+
+      if (!product) {
+        return res.status(404).send({ message: 'Product not found' });
+      }
+
+     
+      if (product.votedUsers && product.votedUsers.includes(userEmail)) {
+        return res.status(400).send({ message: 'User has already voted' });
+      }
 
     
+      const updatedProduct = await productsCollection.updateOne(
+        { name: productName },
+        {
+          $inc: { votes: 1 },
+          $push: { votedUsers: userEmail },
+        }
+      );
 
+      res.send({ message: 'Vote added successfully', updatedProduct });
+    });
 
-    // products related apis
-    app.get('/products', async(req, res) => {
-      const products = productsCollection.find();
-      const result = await products.toArray();
-      res.send(result);
-    })
+    
+    app.get('/users/:email', async (req, res) => {
+      const { email } = req.params;
 
+      const user = await usersCollection.findOne({ email });
 
+      if (!user) {
+        return res.status(404).send({ message: 'User not found' });
+      }
 
+      res.send({
+        email: user.email,
+        subscriptionStatus: user.isSubscribed || false,
+      });
+    });
 
+   
+    app.post('/subscribe', async (req, res) => {
+      const { email } = req.body;
 
+      if (!email) {
+        return res.status(400).send({ message: 'Email is required' });
+      }
 
-    // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+      const user = await usersCollection.findOne({ email });
+
+      if (user && user.isSubscribed) {
+        return res.status(400).send({ message: 'User is already subscribed' });
+      }
+
+      const result = await usersCollection.updateOne(
+        { email },
+        { $set: { isSubscribed: true } },
+        { upsert: true } 
+      );
+
+      res.send({ message: 'Subscription successful', result });
+    });
+
+    console.log('Connected to MongoDB!');
   } finally {
-    // Ensures that the client will close when you finish/error
+    // Uncomment this line if you want to close the connection after the process ends
     // await client.close();
   }
 }
+
 run().catch(console.dir);
 
-
 app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
+  res.send('Server is running');
+});
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`Server listening on port ${port}`);
+});
