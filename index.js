@@ -31,11 +31,31 @@ async function run() {
 
 
     app.get('/products', async (req, res) => {
-      const { page = 1, limit = 10 } = req.query; 
+      const products = productsCollection.find();
+      const result = await products.toArray();
+      res.send(result);
+    });
 
-      const skip = (page - 1) * limit;
-      const products = await productsCollection.find().skip(skip).limit(parseInt(limit)).toArray();
-      res.send(products);
+
+    app.get('/products/:email', async (req, res) => {
+      const { email } = req.params;
+      const query = { ownerMail: email }; 
+      const product = productsCollection.find(query); 
+      const result = await product.toArray(); 
+      res.send(result);
+    });
+    
+
+    app.post('/products', async (req, res) => {
+      const product = req.body;
+      product.timestamp = new Date(); // Add timestamp
+      try {
+        const result = await productsCollection.insertOne(product);
+        res.status(201).send(result);
+      } catch (error) {
+        console.error('Error saving product:', error);
+        res.status(500).send({ message: 'Failed to save product' });
+      }
     });
 
     // Upvote a Product
@@ -118,6 +138,17 @@ async function run() {
         res.status(500).send({ message: 'Internal server error', error: error.message });
       }
     });
+
+
+
+
+
+
+    
+  
+    
+
+    
 
     console.log('Pinged your deployment. You successfully connected to MongoDB!');
   } finally {
