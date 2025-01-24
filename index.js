@@ -5,11 +5,12 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// MongoDB URI and Client Setup
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.zjl69.mongodb.net/?retryWrites=true&w=majority`;
-
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -18,103 +19,121 @@ const client = new MongoClient(uri, {
   },
 });
 
+// Database Connection
 async function run() {
   try {
     await client.connect();
-
     const database = client.db('HuntifyDB');
     const productsCollection = database.collection('products');
-    const usersCollection = database.collection('users'); 
+    const usersCollection = database.collection('users');
 
-
-
+    
 
 
     app.get('/products', async (req, res) => {
-      const products = await productsCollection.find().toArray();
+      const { page = 1, limit = 10 } = req.query; 
+
+      const skip = (page - 1) * limit;
+      const products = await productsCollection.find().skip(skip).limit(parseInt(limit)).toArray();
       res.send(products);
     });
 
-    // Upvote a product
+    // Upvote a Product
     app.post('/products/vote/:productName', async (req, res) => {
-      const { productName } = req.params;
-      const { userEmail } = req.body;
+      try {
+        const { productName } = req.params;
+        const { userEmail } = req.body;
 
-      const product = await productsCollection.findOne({ name: productName });
+  
+        if (!userEmail) return res.status(400).send({ message: 'User email is required' });
 
-      if (!product) {
-        return res.status(404).send({ message: 'Product not found' });
-      }
+        const product = await productsCollection.findOne({ name: productName });
+        if (!product) return res.status(404).send({ message: 'Product not found' });
 
      
-      if (product.votedUsers && product.votedUsers.includes(userEmail)) {
-        return res.status(400).send({ message: 'User has already voted' });
-      }
-
-    
-      const updatedProduct = await productsCollection.updateOne(
-        { name: productName },
-        {
-          $inc: { votes: 1 },
-          $push: { votedUsers: userEmail },
+        if (product.votedUsers && product.votedUsers.includes(userEmail)) {
+          return res.status(400).send({ message: 'User has already voted' });
         }
-      );
 
-      res.send({ message: 'Vote added successfully', updatedProduct });
-    });
 
-    
-    app.get('/users/:email', async (req, res) => {
-      const { email } = req.params;
-
-      const user = await usersCollection.findOne({ email });
-
-      if (!user) {
-        return res.status(404).send({ message: 'User not found' });
+        const updatedProduct = await productsCollection.updateOne(
+          { name: productName },
+          {
+            $inc: { votes: 1 },
+            $push: { votedUsers: userEmail },
+          }
+        );
+        res.send({ message: 'Vote added successfully', updatedProduct });
+      } catch (error) {
+        res.status(500).send({ message: 'Internal server error', error: error.message });
       }
-
-      res.send({
-        email: user.email,
-        subscriptionStatus: user.isSubscribed || false,
-      });
     });
 
    
-    app.post('/subscribe', async (req, res) => {
-      const { email } = req.body;
+    app.get('/users/:email', async (req, res) => {
+      try {
+        const { email } = req.params;
+        const user = await usersCollection.findOne({ email });
+        if (!user) return res.status(404).send({ message: 'User not found' });
 
-      if (!email) {
-        return res.status(400).send({ message: 'Email is required' });
+        res.send({
+          email: user.email,
+          subscriptionStatus: user.isSubscribed || false,
+        });
+      } catch (error) {
+        res.status(500).send({ message: 'Internal server error', error: error.message });
       }
-
-      const user = await usersCollection.findOne({ email });
-
-      if (user && user.isSubscribed) {
-        return res.status(400).send({ message: 'User is already subscribed' });
-      }
-
-      const result = await usersCollection.updateOne(
-        { email },
-        { $set: { isSubscribed: true } },
-        { upsert: true } 
-      );
-
-      res.send({ message: 'Subscription successful', result });
     });
 
-    console.log('Connected to MongoDB!');
+    // Subscribe a User
+    app.post('/subscribe', async (req, res) => {
+      try {
+        const { email } = req.body;
+        if (!email) return res.status(400).send({ message: 'Email is required' });
+
+        const user = await usersCollection.findOne({ email });
+        if (user && user.isSubscribed) {
+          return res.status(400).send({ message: 'User is already subscribed' });
+        }
+
+        const result = await usersCollection.updateOne(
+          { email },
+          { $set: { isSubscribed: true } },
+          { upsert: true } // Create user if not exists
+        );
+        res.send({ message: 'Subscription successful', result });
+      } catch (error) {
+        res.status(500).send({ message: 'Internal server error', error: error.message });
+      }
+    });
+
+    
+    app.get('/users', async (req, res) => {
+      try {
+        const { page = 1, limit = 10 } = req.query; // Default: page 1, 10 users per page
+        const skip = (page - 1) * limit;
+        const users = await usersCollection.find().skip(skip).limit(parseInt(limit)).toArray();
+        res.send(users);
+      } catch (error) {
+        res.status(500).send({ message: 'Internal server error', error: error.message });
+      }
+    });
+
+    console.log('Pinged your deployment. You successfully connected to MongoDB!');
   } finally {
-    // Uncomment this line if you want to close the connection after the process ends
+    // Uncomment this line to close the client connection when app stops
     // await client.close();
   }
 }
 
 run().catch(console.dir);
 
+// Base Route
 app.get('/', (req, res) => {
   res.send('Server is running');
 });
 
+// Start the Server
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
