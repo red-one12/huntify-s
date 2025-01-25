@@ -44,6 +44,57 @@ async function run() {
       const result = await product.toArray(); 
       res.send(result);
     });
+
+
+    app.get('/product/:id', async (req, res) => {
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) }; 
+      const product = productsCollection.find(query); 
+      const result = await product.toArray(); 
+      res.send(result);
+    });
+
+    // Update product by ID
+app.put('/product/:id', async (req, res) => {
+  try {
+    const { id } = req.params; // Get product ID from the URL
+    const updatedData = req.body; // Get updated product data from request body
+
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(id) }, // Find product by ID
+      { $set: updatedData } // Update the fields
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).send({ message: 'Product not found or no changes made' });
+    }
+
+    res.send({ message: 'Product updated successfully', result });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).send({ message: 'Internal server error', error: error.message });
+  }
+});
+
+
+// Delete a product by ID
+app.delete('/products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await productsCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: 'Product not found' });
+    }
+
+    res.send({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    res.status(500).send({ message: 'Internal server error', error: error.message });
+  }
+});
+
     
 
     app.post('/products', async (req, res) => {
