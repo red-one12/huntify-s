@@ -168,6 +168,61 @@ async function run() {
       }
     });
 
+    // Accept a Product by ID
+    app.post("/products/accept/:id", async (req, res) => {
+      try {
+        const { id } = req.params; // Get the product ID from the URL
+
+        // Find and update the product status to "Accepted"
+        const result = await productsCollection.updateOne(
+          { _id: new ObjectId(id) }, // Match the product by its ID
+          { $set: { status: "Accepted" } } // Update the status to "Accepted"
+        );
+
+        // Check if the product was found and updated
+        if (result.modifiedCount === 0) {
+          return res
+            .status(404)
+            .send({ message: "Product not found or already accepted" });
+        }
+
+        res.send({ message: "Product accepted successfully", result });
+      } catch (error) {
+        console.error("Error accepting product:", error);
+        res
+          .status(500)
+          .send({ message: "Internal server error", error: error.message });
+      }
+    });
+
+    // Mark a Product as Featured
+app.post('/products/feature/:id', async (req, res) => {
+  try {
+    const { id } = req.params; // Get the product ID from the URL
+
+    // Find and update the product status to "Featured"
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(id) }, 
+      { $set: { isFeatured: true } } 
+    );
+
+    // Check if the product was found and updated
+    if (result.modifiedCount === 0) {
+      return res.status(404).send({ message: 'Product not found or already featured' });
+    }
+
+    res.send({ message: 'Product marked as featured successfully', result });
+  } catch (error) {
+    console.error('Error marking product as featured:', error);
+    res.status(500).send({ message: 'Internal server error', error: error.message });
+  }
+});
+
+
+
+
+
+
     app.get("/users/:email", async (req, res) => {
       try {
         const { email } = req.params;
