@@ -26,6 +26,57 @@ async function run() {
     const database = client.db("HuntifyDB");
     const productsCollection = database.collection("products");
     const usersCollection = database.collection("users");
+    const couponCollection = database.collection("coupons");
+
+
+    // coupons relate apis 
+    app.post("/coupons", async (req, res) => {
+      const coupon = req.body;
+      try {
+        if (!coupon.couponCode || !coupon.expiryDate || !coupon.description || !coupon.discountAmount) {
+          return res.status(400).send({ error: "All fields are required" });
+        }
+        const result = await couponCollection.insertOne(coupon);
+        res.status(201).send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: "Failed to add coupon" });
+      }
+    });
+    
+    app.get("/coupons", async (req, res) => {
+      const coupons = couponCollection.find();
+      const result = await coupons.toArray();
+      res.send(result);
+    });
+    app.delete("/coupons/:id", async (req, res) => {
+      const id = req.params.id;
+    
+      try {
+        // Ensure the ID is valid for MongoDB ObjectId
+        const objectId = new ObjectId(id);
+    
+        // Delete the coupon with the specified ID
+        const result = await couponCollection.deleteOne({ _id: objectId });
+    
+        if (result.deletedCount === 1) {
+          res.status(200).send({ message: "Coupon deleted successfully" });
+        } else {
+          res.status(404).send({ error: "Coupon not found" });
+        }
+      } catch (error) {
+        console.error("Error deleting coupon:", error);
+        res.status(500).send({ error: "Failed to delete coupon" });
+      }
+    });
+    
+
+
+
+
+
+    
+
 
     app.get("/products", async (req, res) => {
       const products = productsCollection.find();
@@ -219,6 +270,60 @@ app.post('/products/feature/:id', async (req, res) => {
 });
 
 
+// Report a Product by ID
+app.patch("/products/report/:id", async (req, res) => {
+  try {
+    const { id } = req.params; // Get the product ID from the URL
+
+    // Find and update the product's `isReported` field or increment `reportCount`
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(id) }, // Match the product by its ID
+      {
+        $set: { isReported: true }, // Option 1: Mark as reported
+        $inc: { reportCount: 1 },  // Option 2: Increment report count
+      }
+    );
+
+    // Check if the product was found and updated
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .send({ message: "Product not found or already reported" });
+    }
+
+    res.send({ message: "Product reported successfully", result });
+  } catch (error) {
+    console.error("Error reporting product:", error);
+    res
+      .status(500)
+      .send({ message: "Internal server error", error: error.message });
+  }
+});
+
+// Delete a product by ID
+app.delete("/product/:id", async (req, res) => {
+  try {
+    const { id } = req.params; // Get the product ID from the request params
+
+    const result = await productsCollection.deleteOne({
+      _id: new ObjectId(id), // Match the product by its unique ObjectId
+    });
+
+    // Check if a product was actually deleted
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "Product not found" });
+    }
+
+    res.send({ message: "Product deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    res
+      .status(500)
+      .send({ message: "Internal server error", error: error.message });
+  }
+});
+
+
 
 
 
@@ -267,6 +372,27 @@ app.post('/products/feature/:id', async (req, res) => {
       }
     });
 
+
+
+    app.post("/users", async (req, res) => {
+      try {
+        const newUser = req.body;
+    
+        // Check if user already exists
+        const existingUser = await usersCollection.findOne({ email: newUser.email });
+        if (existingUser) {
+          return res.status(400).send({ message: "User already exists" });
+        }
+    
+        // Insert new user
+        const result = await usersCollection.insertOne(newUser);
+        res.status(201).send({ message: "User added successfully", insertedId: result.insertedId });
+      } catch (error) {
+        console.error("Error adding user:", error);
+        res.status(500).send({ message: "Internal server error", error: error.message });
+      }
+    });
+    
     app.get("/users", async (req, res) => {
       try {
         const { page = 1, limit = 10 } = req.query; // Default: page 1, 10 users per page
@@ -283,6 +409,61 @@ app.post('/products/feature/:id', async (req, res) => {
           .send({ message: "Internal server error", error: error.message });
       }
     });
+
+    // Make a user a Moderator
+app.patch("/users/:id/moderator", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { position: "moderator" } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .send({ message: "User not found or already a Moderator" });
+    }
+
+    res.send({ message: "User updated to Moderator successfully", result });
+  } catch (error) {
+    console.error("Error making user Moderator:", error);
+    res
+      .status(500)
+      .send({ message: "Internal server error", error: error.message });
+  }
+});
+
+// Make a user an Admin
+app.patch("/users/:id/admin", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { position: "admin" } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .send({ message: "User not found or already an Admin" });
+    }
+
+    res.send({ message: "User updated to Admin successfully", result });
+  } catch (error) {
+    console.error("Error making user Admin:", error);
+    res
+      .status(500)
+      .send({ message: "Internal server error", error: error.message });
+  }
+});
+
+
+
+
+
 
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
