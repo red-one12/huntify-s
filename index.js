@@ -27,6 +27,76 @@ async function run() {
     const productsCollection = database.collection("products");
     const usersCollection = database.collection("users");
     const couponCollection = database.collection("coupons");
+    const reviewCollection = database.collection("reviews");
+
+
+// Reviews related APIs
+app.post('/reviews', async (req, res) => {
+    try {
+        const { productId, userName, userImage, description, rating } = req.body;
+
+        // Validate required fields
+        if (!productId || !userName || !userImage || !description || !rating) {
+            return res.status(400).json({ message: "All fields are required!" });
+        }
+
+        // Ensure rating is a valid number
+        if (typeof rating !== "number" || rating < 1 || rating > 5) {
+            return res.status(400).json({ message: "Rating must be a number between 1 and 5." });
+        }
+
+        // Create a new review object
+        const newReview = {
+            productId,
+            userName,
+            userImage,
+            description,
+            rating,
+            createdAt: new Date(),
+        };
+
+        // Insert the review into the reviews collection
+        const result = await reviewCollection.insertOne(newReview);
+
+        if (result.insertedId) {
+            res.status(201).json({
+                message: "Review added successfully!",
+                reviewId: result.insertedId,
+            });
+        } else {
+            res.status(500).json({ message: "Failed to add review. Please try again later." });
+        }
+    } catch (error) {
+        console.error("Error adding review:", error);
+        res.status(500).json({ message: "An error occurred while adding the review.", error });
+    }
+});
+
+app.get("/reviews", async (req, res) => {
+  const reviews = reviewCollection.find();
+  const result = await reviews.toArray();
+  res.send(result);
+});
+app.get("/review/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate the ID format
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ error: "Invalid product ID format" });
+    }
+
+    const query = { productId: id };
+    const reviewCursor = reviewCollection.find(query);
+    const reviews = await reviewCursor.toArray();
+
+    res.status(200).send(reviews);
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    res.status(500).send({ error: "An error occurred while fetching reviews" });
+  }
+});
+
 
 
     // coupons relate apis 
@@ -79,10 +149,23 @@ async function run() {
 
 
     app.get("/products", async (req, res) => {
-      const products = productsCollection.find();
-      const result = await products.toArray();
-      res.send(result);
+      const search = req.query.search; // Get the search keyword from query parameters
+    
+      // Define the query condition
+      const query = search
+        ? { tags: { $in: [new RegExp(search, "i")] } } // Search tags based on the keyword (case-insensitive)
+        : {}; // Otherwise, retrieve all products
+    
+      try {
+        const products = productsCollection.find(query); // Fetch products based on the query
+        const result = await products.toArray();
+        res.send(result); // Send the result to the client
+      } catch (error) {
+        res.status(500).send({ error: "Failed to fetch products" }); // Handle errors
+      }
     });
+    
+    
 
     app.get("/products/:email", async (req, res) => {
       const { email } = req.params;
