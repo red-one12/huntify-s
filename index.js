@@ -23,7 +23,7 @@ const client = new MongoClient(uri, {
 // Database Connection
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const database = client.db("HuntifyDB");
     const productsCollection = database.collection("products");
     const usersCollection = database.collection("users");
@@ -490,20 +490,9 @@ app.delete("/product/:id", async (req, res) => {
     });
     
     app.get("/users", async (req, res) => {
-      try {
-        const { page = 1, limit = 10 } = req.query; // Default: page 1, 10 users per page
-        const skip = (page - 1) * limit;
-        const users = await usersCollection
-          .find()
-          .skip(skip)
-          .limit(parseInt(limit))
-          .toArray();
-        res.send(users);
-      } catch (error) {
-        res
-          .status(500)
-          .send({ message: "Internal server error", error: error.message });
-      }
+      const users = usersCollection.find();
+      const result = await users.toArray();
+      res.send(result);
     });
 
     // Make a user a Moderator
@@ -561,9 +550,9 @@ app.patch("/users/:id/admin", async (req, res) => {
 
 
 
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Uncomment this line to close the client connection when app stops
     // await client.close();
