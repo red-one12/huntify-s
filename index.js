@@ -23,7 +23,7 @@ const client = new MongoClient(uri, {
 // Database Connection
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const database = client.db("HuntifyDB");
     const productsCollection = database.collection("products");
     const usersCollection = database.collection("users");
@@ -574,9 +574,9 @@ app.patch("/users/:id/admin", async (req, res) => {
 
 
 
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Uncomment this line to close the client connection when app stops
     // await client.close();
