@@ -47,7 +47,11 @@ async function run() {
     })
 
 
-    
+    app.post('/helps', async(req, res) => {
+      const helpInfo = req.body;
+      const result = await helpCollection.insertOne(helpInfo);
+      res.send(result);
+    })
 
 
 
