@@ -23,12 +23,15 @@ const client = new MongoClient(uri, {
 // Database Connection
 async function run() {
   try {
-    // await client.connect();
+    await client.connect();
     const database = client.db("HuntifyDB");
     const productsCollection = database.collection("products");
     const usersCollection = database.collection("users");
     const couponCollection = database.collection("coupons");
     const reviewCollection = database.collection("reviews");
+    const newsLetterCollection = database.collection("newsLetters");
+    const helpCollection = database.collection("help");
+
 
 
 
@@ -42,6 +45,23 @@ async function run() {
       });
       res.send({token});
     })
+
+
+    
+
+
+
+    // newsletter related apis 
+    app.post('/newsletter', async(req, res) => {
+      const newsletter = req.body;
+      const result = await newsLetterCollection.insertOne(newsletter);
+
+      res.send(result);
+    })
+
+    
+
+
 
 // Reviews related APIs
 app.post('/reviews', async (req, res) => {
@@ -550,9 +570,9 @@ app.patch("/users/:id/admin", async (req, res) => {
 
 
 
-    // console.log(
-    //   "Pinged your deployment. You successfully connected to MongoDB!"
-    // );
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // Uncomment this line to close the client connection when app stops
     // await client.close();
